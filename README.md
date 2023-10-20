@@ -16,7 +16,7 @@ A slick, zero-dependancy interactive SVG visualisation / background for your web
 Include the library as a script, directly on your page:
 
 ```html
-<script src="//cdn.jsdelivr.net/gh/theprojectsomething/vi-bg/dist/vi-bg.umd.js"></script>
+<script src="//cdn.jsdelivr.net/gh/theprojectsomething/vi-bg/dist/vi-bg.umd.cjs"></script>
 ```
 
 Optionally, set configuration options via data attributes:
@@ -28,7 +28,7 @@ Optionally, set configuration options via data attributes:
   data-size=1
   data-length=0
   bg=wave
-  src="//cdn.jsdelivr.net/gh/theprojectsomething/vi-bg/dist/vi-bg.umd.js"
+  src="//cdn.jsdelivr.net/gh/theprojectsomething/vi-bg/dist/vi-bg.umd.cjs"
 ></script>
 ```
 
