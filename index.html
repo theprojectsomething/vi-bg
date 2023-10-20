@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="https://xbr463.p3cdn1.secureserver.net/wp-content/uploads/2023/09/Logo_only.png" />
+    <title>Visual Ice Cream: BG</title>
+    <style>
+      html, body {
+        margin: 0;
+        font-size: 10px;
+        font-family: monospace, monospace;
+        color: #eee;
+      }
+
+      @media (max-width: 400px) {
+        body {
+          font-size: 2.5vw;
+        }
+      }
+
+      body {
+        background: #1b1b1b;
+        display: grid;
+        grid-template-areas: "A" "B" "C";
+        grid-template-columns: auto;
+        grid-template-rows: 1fr 1fr 1fr;
+        align-items: center;
+        justify-items: center;
+        min-height:  300vh;
+      }
+
+      img {
+        width: 24em;
+        max-width: 50%;
+        grid-area: A;
+        cursor: pointer;
+        transition: opacity, filter, transform cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition-duration: 0.3s;
+        transition-delay: 0.3s;
+      }
+
+      img:not(:hover) {
+        filter: grayscale(1);
+        opacity:  0.1;
+      }
+
+      img:hover:not(:active) {
+        transform: scale(1.1);
+      }
+
+      h1 {
+        grid-area: B;
+        font-size: 2em;
+      }
+
+      p {
+        grid-area: C;
+        font-size: 1.4em;
+        max-width: 38ch;
+      }
+
+      .cursor-container {
+        position: fixed;
+        z-index: -1;
+        top: 0;
+        left: 0;
+      }
+
+      footer {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+      }
+
+      input, button {
+        margin: 1em;
+      }
+
+      code {
+        width:  100%;
+        text-align: center;
+        padding: 0 1em 1em;
+        color: #666;
+      }
+
+      aside {
+        padding:  1em 2em;
+        margin-bottom:  8em;
+        background: #1b1b1b66;
+      }
+
+      a {
+        color: #fff;
+        text-decoration: dotted underline;
+        text-underline-offset: 0.4em;
+      }
+
+      a:hover {
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <img src="https://xbr463.p3cdn1.secureserver.net/wp-content/uploads/2023/09/Logo_only.png" />
+    <h1>Picture me scrollin'</h1>
+    <p>My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll. My name is Brett and I like to scroll.</p>
+    <aside>A library / fork / ever-so-slight adaptation of <a href="https://github.com/marvinx-x/cursors-emitter">marvinx-x/cursors-emitter</a></aside>
+
+    <footer>
+      <input title=colourA type=color value=#e3a6f8>
+      <input title=colourB type=color value=#82f8d9>
+      <input title=length type=range min="0" step=0.5 max=2>
+      <input title=size type=range min="0" step=0.5 max=2>
+      <input title=taper type=range min="0" step=0.5 max=2>
+      <input title=invert type=checkbox>
+      <button title="toggle play/pause">⏯︎</button>
+      <code></code>
+
+      <!-- <script data-bg="trail" data-x-start="0" data-y-start="0" src="./dist/vi-bg.umd.cjs"></script> -->
+
+      <script type="module">
+        import { getConfig, getDefaultConfig, init, pause, paused, play, setConfig } from "./src/index.js";
+        const $code = document.querySelector('code');
+        let defaultConfig;
+        const ignoreConfig = ['xStart', 'yStart', 'paused'];
+
+        const renderScript = () => {
+          const attributes = defaultConfig ? Object.entries(getConfig()).reduce((list, [key, val]) => {
+            if (!ignoreConfig.includes(key) && defaultConfig[key] !== val) {
+              list.push(`data-${key.replace(/[A-Z]/g, (s) => '-' + s.toLowerCase())}=${val}`);
+            }
+            return list;
+          }, []) : [];
+
+          $code.innerText = `<script ${attributes.join(" ")} src="vi-bg.js">`;
+        }
+
+        const onInput = ({ target: { title, value, type, checked }}) => {
+          const config = getConfig();
+          config[title] = type === "checkbox" ? checked : value;
+          setConfig(config);
+          renderScript();
+        }
+
+        [...document.querySelectorAll('input')].forEach((el) => {
+          el.addEventListener('input', onInput);
+          el.dispatchEvent(new Event('input'));
+        });
+        
+        document.querySelector('button')
+          .addEventListener('click', () =>
+            paused() ? play() : pause());
+
+
+        const nextBg = () => {
+          const { xStart, yStart, ...config } = getConfig();
+          config.bg = config.bg === 'trail' ? 'wave' : config.bg === 'wave' && 'tube' || 'trail';
+          init(config);
+          defaultConfig = {
+            ...getDefaultConfig(),
+            paused: false,
+            xStart, yStart
+          }
+          renderScript();
+        }
+
+        nextBg();
+        document.querySelector('img').addEventListener('click', nextBg);
+      </script>
+    </footer>
+  </body>
+</html>

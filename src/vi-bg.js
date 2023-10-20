@@ -1,41 +1,81 @@
-import * as d3 from "d3";
 import { isTouchDevices } from "./utils";
 
-export class Cursors{
+export class viBg{
 
-  constructor(index) {
-    this.container = document.querySelector(`#cursor-${index}`);
-    this.links = document.querySelectorAll(`nav[role="navigation"] a`);
-    this.link = this.links[index-1];
-    this.boundsLinks = this.link.getBoundingClientRect();
-    this.xStart = this.boundsLinks.left + this.boundsLinks.width/2;
-    this.yStart = this.boundsLinks.top + this.boundsLinks.height/2;
-    this.mouse = { x: this.xStart,y: this.yStart };
-    this.pos = { x: this.xStart, y: this.yStart };
+  constructor(container, userConfig) {
+    this.setConfig(userConfig, false, container);
+    this.controller = new AbortController();
+    this.container = container;
+    const { width, height } = this.rect();
+    this.mouse = {
+      x: Math.round(width * Math.max(-0.5, Math.min(1.5, this.config.xStart))),
+      y: Math.round(height * Math.max(-0.5, Math.min(1.5, this.config.yStart))),
+    };
+    this.pos = { ...this.mouse };
     this.diff = { x: null,y: null };
     this.tinyCursor = true;
     this.transitionParticles = false;
     this.cursor = false;
-    this.activeLinks();
     this.mousemoveCursor();
-    window.addEventListener('resize',(e) => this.init());
+    addEventListener('resize', () => this.init(true), {
+      signal: this.controller.signal
+    });
+  }
+
+  defaultConfig() {
+    return {};
+  }
+
+  getConfig() {
+    return { ...this.config };
+  }
+
+  setConfig(userConfig, reload, container) {
+    this.config = {
+      bg: '',
+      xStart: 0.5,
+      yStart: 0.5,
+      paused: !!this.isPaused,
+      ...this.defaultConfig()
+    };
+    if (!userConfig) {
+      return;
+    }
+
+    for (const [key, defaultVal] of Object.entries(this.config)) {
+      if (!(key in userConfig)) {
+        continue;
+      }
+
+      const type = typeof defaultVal;
+      const val = userConfig[key];
+      if (typeof val === type) {
+        this.config[key] = val;
+      } else if (type === "boolean") {
+        this.config[key] = val ? !!+val : true;
+      } else if (type === "number" && !isNaN(val)) {
+        this.config[key] = +val;
+      } else if (type === "string") {
+        this.config[key] = val;
+      }
+    }
+    if (reload) {
+      this.init(true);
+    }
   }
 
   mousemoveCursor() {
-    window.addEventListener(isTouchDevices ? 'touchmove' : 'mousemove',(e) => {
-      this.updateCoordinates(e);
-    },{ passive : true });
+    this.container.parentElement.addEventListener(isTouchDevices ? 'touchmove' : 'mousemove', this.updateCoordinates.bind(this), {
+      passive : true,
+      signal: this.controller.signal,
+    });
   }
 
   updateCoordinates(e) {
-    if (e.type.match('touch')) {
-      this.mouse.x = e.touches[0].clientX;
-      this.mouse.y = e.touches[0].clientY;
-    }
-    else {
-      this.mouse.x = e.clientX;
-      this.mouse.y = e.clientY;
-    }
+    const { clientX, clientY } = e.type.match('touch') ? e.touches[0] : e;
+    const { x, y } = this.rect();
+    this.mouse.x = clientX - x;
+    this.mouse.y = clientY - y;
   }
 
   setParamsDiffs(){
@@ -45,28 +85,56 @@ export class Cursors{
     this.pos.y += this.diff.y * this.speed;
   }
 
-  init() {
+  paused() {
+    return this.isPaused;
+  }
+
+  pause(pause = true){
+    this.isPaused = !!pause;
+    this.loop();
+  }
+
+  play(){
+    this.pause(false);
+  }
+
+  destroy() {
+    this.pause();
+    this.controller.abort();
+  }
+
+  init(refreshBounds) {
+    if (refreshBounds) {
+      this.rect(true);
+    }
+
+    this.isPaused = this.config.paused;
     this.tinyCursor ? this.setParamsCursor() : null;
     this.setParamsParticles();
     this.drawCursor();
   }
 
   loop() {
+    cancelAnimationFrame(this.nextFrame)
+    if (this.isPaused) {
+      return;
+    }
     this.setParamsDiffs();
     this.tinyCursor ? this.setTinyCursor() : null;
     this.setParticles();
-    requestAnimationFrame( () => this.loop() );
+    this.nextFrame = requestAnimationFrame(() => this.loop());
   }
 
 
   drawCursor() {
-    this.widthContainer = window.innerWidth;
-    this.heightContainer = window.innerHeight;
-    this.container.innerHTML =
+    this.invert = this.sorting === "desc";
+    const { width, height } = this.rect();
+    this.container.querySelectorAll('svg').forEach(el => el.remove());
+    this.container.innerHTML +=
       `<svg
-        width="${this.widthContainer}"
-        height="${this.heightContainer}"
-        viewbox="0 0 ${this.widthContainer} ${this.heightContainer}"
+        width="${width}"
+        height="${height}"
+        viewbox="0 0 ${width} ${height}"
         preserveAspectRatio="${this.preserveAspectRatio || "none"}"
         style="background:${this.backColor || "none"}; cursor:${this.cursor ? "default" : "none"};">
         ${this.gradientParticles ? this.drawGradient() : ''}
@@ -76,10 +144,10 @@ export class Cursors{
     this.svg = this.container.querySelector('svg');
     this.tinyCursor ? this.nodeCursors = this.container.querySelectorAll('.tiny-cursor circle') : null;
     this.particles = Array.from(this.container.querySelectorAll('.particles circle'));
-    this.sorting === "desc" ? this.sortParticles() : null;
+
     this.points = Array(this.nbrParticles).fill().map((el,i) => {
       return {
-        node: this.particles[i],
+        node: this.particles[this.invert ? this.nbrParticles - 1 - i : i],
         x: this.pos.x,
         y: this.pos.y,
       }
@@ -128,17 +196,13 @@ export class Cursors{
 
   drawParticles() {
     return `<g class="particles" filter=${this.filterParticles || "none"}>
-      ${(() => {
-        if (this.strokeGradient) {
-          return `
+      ${this.strokeGradient ? `
           <defs>
             <linearGradient id=${this.strokeGradient.idStrokeGradient} x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stop-color=${this.strokeGradient.color1} />
               <stop offset="100%" stop-color=${this.strokeGradient.color2} />
             </linearGradient>
-          </defs>`
-        }
-      })()}
+          </defs>` : ''}
       ${Array(this.nbrParticles).fill().map((_,i) =>
         `<circle
           r="${this.setRadiusParticles(i)}"
@@ -177,13 +241,8 @@ export class Cursors{
     }
   }
 
-  sortParticles(){
-    this.particlesD3 = d3.selectAll(this.particles);
-    this.particlesD3.data(this.particlesD3._groups[0].map((particle) => { return Number(particle.id) }));
-    this.particlesD3.sort(d3.descending);
-  }
-
-  setRadiusParticles(i) {
+  setRadiusParticles(index) {
+    const i = this.invert ? this.nbrParticles - index - 1 : index;
     this.radius = null;
     if(this.directionRadius === ">"){
       this.radius = this.radiusStart-(i*this.radiusDiff);}
@@ -193,15 +252,12 @@ export class Cursors{
     return this.radius;
   }
 
-  diagonalWindow() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
-    return Math.ceil(Math.sqrt(this.width*this.width + this.height*this.height));
-  }
-
-  activeLinks() {
-    this.activeClass = 'active';
-    for (const link of this.links) { link.classList.remove(this.activeClass) };
-    this.link.classList.add(this.activeClass);
+  rect(forceUpdate) {
+    if (!this._rect || forceUpdate) {
+      const { x, y, width, height } = this.container.parentElement.getBoundingClientRect();
+      this._rect = { x: x + scrollX, y: y + scrollY, width: Math.min(width, innerWidth), height: Math.min(height, innerHeight) };
+      this._rect.diag = Math.ceil((this._rect.width ** 2 + this._rect.width ** 2) ** 0.5);
+    }
+    return this._rect;
   }
 }
